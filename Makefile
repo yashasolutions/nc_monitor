@@ -14,7 +14,7 @@ LDFLAGS=-ldflags "-X main.version=$(GIT_COMMIT) -X main.buildTime=$(BUILD_TIME)"
 
 # Default target
 .PHONY: all
-all: clean build
+all: build
 
 # Create build directory
 $(BUILD_DIR):
