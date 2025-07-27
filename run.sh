@@ -1,4 +1,4 @@
 #!/usr/bin/env sh
 
-source .env
-./nc_monitor
+source ./.env
+./build/nc_monitor

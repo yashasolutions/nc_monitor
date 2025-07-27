@@ -16,18 +16,12 @@ LDFLAGS=-ldflags "-X main.version=$(GIT_COMMIT) -X main.buildTime=$(BUILD_TIME)"
 .PHONY: all
 all: build
 
-# Create build directory
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
 # Build the binary
-$(BUILD_DIR)/$(BINARY_NAME): $(BUILD_DIR) $(SOURCE_FILE)
+build:
+	mkdir -p $(BUILD_DIR)
 	@echo "Building $(BINARY_NAME)..."
 	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(SOURCE_FILE)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
-
-.PHONY: build
-build: $(BUILD_DIR)/$(BINARY_NAME)
 
 # Build for multiple platforms
 .PHONY: build-all
