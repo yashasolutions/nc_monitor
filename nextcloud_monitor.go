@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -76,7 +77,12 @@ func main() {
 	}
 	defer logFile.Close()
 
-	logger := log.New(logFile, "", log.LstdFlags|log.Lshortfile)
+	var logWriter io.Writer = logFile
+	if cfg.Verbose {
+		logWriter = io.MultiWriter(logFile, os.Stdout)
+	}
+
+	logger := log.New(logWriter, "", log.LstdFlags|log.Lshortfile)
 
 	// Check for existing instance
 	if err := checkInstance(); err != nil {
