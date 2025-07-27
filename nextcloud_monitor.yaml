@@ -1,0 +1,42 @@
+# Nextcloud Monitor Configuration
+# This file can be placed in:
+# - Current directory: ./nextcloud_monitor.yaml
+# - User config: ~/.config/nextcloud_monitor/nextcloud_monitor.yaml
+# - System config: /etc/nextcloud_monitor/nextcloud_monitor.yaml
+
+# Directory to watch for changes
+watch_dir: "~/org/roam"
+
+# Remote directory path in Nextcloud
+remote_dir: "/org/roam"
+
+# Nextcloud server URL (without protocol prefix in the URL since it's added in the sync command)
+url: "nextcloud.example.com"
+
+# Nextcloud credentials
+user: "your_username"
+password: "your_password"
+
+# Log and PID file locations
+log_file: "/tmp/nextcloud_monitor.log"
+pid_file: "/tmp/nextcloud_monitor.pid"
+
+# Sync settings
+sync_cooldown: "10s"  # Minimum time between syncs
+sync_interval: "*/5 * * * *"  # Cron expression for periodic sync
+
+# Enable verbose logging
+verbose: false
+
+# File patterns to ignore
+ignore_patterns:
+  - "*.tmp"
+  - "*.temp"
+  - "*.log"
+  - "*~"
+  - ".DS_Store"
+  - "Thumbs.db"
+  - ".git/*"
+  - "*.swp"
+  - "*.lock"
+  - ".nextcloud_sync_*"

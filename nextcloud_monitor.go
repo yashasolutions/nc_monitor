@@ -14,6 +14,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/robfig/cron/v3"
+	"github.com/spf13/viper"
 )
 
 // Config holds all configuration values
@@ -36,30 +37,65 @@ var (
 )
 
 func init() {
-	// Initialize configuration from environment variables
-	cfg = &Config{
-		WatchDir:      getEnv("NEXTCLOUD_WATCH_DIR", "~/org/roam"),
-		RemoteDir:     getEnv("NEXTCLOUD_REMOTE_DIR", "/org/roam"),
-		NextcloudURL:  getEnv("NEXTCLOUD_URL", "https://nextcloud.example.com"),
-		Username:      getEnv("NEXTCLOUD_USER", "nextcloud_user"),
-		Password:      getEnv("NEXTCLOUD_PASSWORD", "nexcloud_pass"),
-		LogFile:       getEnv("NEXTCLOUD_LOG_FILE", "/tmp/nextcloud_monitor.log"),
-		PidFile:       getEnv("NEXTCLOUD_PID_FILE", "/tmp/nextcloud_monitor.pid"),
-		SyncCooldown:  10 * time.Second,
-		SyncInterval:  getEnv("NEXTCLOUD_SYNC_INTERVAL", "*/5 * * * *"),
-		Verbose:       getEnv("NEXTCLOUD_VERBOSE", "false") == "true",
-		IgnorePatterns: []string{
-			"*.tmp", "*.temp", "*.log", "*~", ".DS_Store",
-			"Thumbs.db", ".git/*", "*.swp", "*.lock", ".nextcloud_sync_*",
-		},
-	}
+	cfg = initConfig()
 }
 
-func getEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
+func initConfig() *Config {
+	// Set up Viper
+	viper.SetConfigName("nextcloud_monitor")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("$HOME/.config/nextcloud_monitor")
+	viper.AddConfigPath("/etc/nextcloud_monitor")
+
+	// Set environment variable prefix
+	viper.SetEnvPrefix("NEXTCLOUD")
+	viper.AutomaticEnv()
+
+	// Set defaults
+	viper.SetDefault("watch_dir", "~/org/roam")
+	viper.SetDefault("remote_dir", "/org/roam")
+	viper.SetDefault("url", "https://nextcloud.example.com")
+	viper.SetDefault("user", "nextcloud_user")
+	viper.SetDefault("password", "nextcloud_pass")
+	viper.SetDefault("log_file", "/tmp/nextcloud_monitor.log")
+	viper.SetDefault("pid_file", "/tmp/nextcloud_monitor.pid")
+	viper.SetDefault("sync_cooldown", "10s")
+	viper.SetDefault("sync_interval", "*/5 * * * *")
+	viper.SetDefault("verbose", false)
+	viper.SetDefault("ignore_patterns", []string{
+		"*.tmp", "*.temp", "*.log", "*~", ".DS_Store",
+		"Thumbs.db", ".git/*", "*.swp", "*.lock", ".nextcloud_sync_*",
+	})
+
+	// Read config file if it exists
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			log.Printf("Error reading config file: %v", err)
+		}
 	}
-	return defaultValue
+
+	// Parse sync cooldown duration
+	cooldownStr := viper.GetString("sync_cooldown")
+	cooldown, err := time.ParseDuration(cooldownStr)
+	if err != nil {
+		log.Printf("Invalid sync_cooldown format '%s', using default 10s", cooldownStr)
+		cooldown = 10 * time.Second
+	}
+
+	return &Config{
+		WatchDir:       viper.GetString("watch_dir"),
+		RemoteDir:      viper.GetString("remote_dir"),
+		NextcloudURL:   viper.GetString("url"),
+		Username:       viper.GetString("user"),
+		Password:       viper.GetString("password"),
+		LogFile:        viper.GetString("log_file"),
+		PidFile:        viper.GetString("pid_file"),
+		SyncCooldown:   cooldown,
+		SyncInterval:   viper.GetString("sync_interval"),
+		Verbose:        viper.GetBool("verbose"),
+		IgnorePatterns: viper.GetStringSlice("ignore_patterns"),
+	}
 }
 
 type Monitor struct {
