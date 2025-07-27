@@ -21,11 +21,13 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 # Build the binary
-.PHONY: build
-build: $(BUILD_DIR)
+$(BUILD_DIR)/$(BINARY_NAME): $(BUILD_DIR) $(SOURCE_FILE)
 	@echo "Building $(BINARY_NAME)..."
 	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(SOURCE_FILE)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
+
+.PHONY: build
+build: $(BUILD_DIR)/$(BINARY_NAME)
 
 # Build for multiple platforms
 .PHONY: build-all
