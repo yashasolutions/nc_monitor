@@ -21,6 +21,7 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 # Build the binary
+.PHONY: build
 build: $(BUILD_DIR)
 	@echo "Building $(BINARY_NAME)..."
 	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(SOURCE_FILE)
