@@ -5,17 +5,17 @@
 # - System config: /etc/nextcloud_monitor/nextcloud_monitor.yaml
 
 # Directory to watch for changes
-watch_dir: "~/org/roam"
+watch_dir: "org/roam"
 
 # Remote directory path in Nextcloud
 remote_dir: "/org/roam"
 
 # Nextcloud server URL (without protocol prefix in the URL since it's added in the sync command)
-url: "nextcloud.example.com"
+url: "https://...."
 
 # Nextcloud credentials
-user: "your_username"
-password: "your_password"
+user: "username"
+password: "password"
 
 # Log and PID file locations
 log_file: "/tmp/nextcloud_monitor.log"
