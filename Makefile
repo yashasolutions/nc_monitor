@@ -17,7 +17,7 @@ LDFLAGS=-ldflags "-X main.version=$(GIT_COMMIT) -X main.buildTime=$(BUILD_TIME)"
 all: build
 
 # Build the binary
-build:
+build: $(SOURCE_FILE)
 	mkdir -p $(BUILD_DIR)
 	@echo "Building $(BINARY_NAME)..."
 	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(SOURCE_FILE)
