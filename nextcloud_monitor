@@ -1,0 +1,236 @@
+#!/bin/bash
+
+# Nextcloud Folder Monitor Script
+# Monitors a folder for changes and syncs with Nextcloud when files are modified
+# Supports ignoring specific files/patterns
+
+# Configuration
+export WATCH_DIR="$HOME/org/roam"
+export USERNAME="yashasolutions"
+export PASSWORD="3GHKH-9LnW3-C4rgB-n3H7c-ZNapk"
+export REMOTE_DIR="/org/roam"
+export NEXTCLOUD_URL="https://$USERNAME:$PASSWORD@cloud.0x42f.net"
+
+# Files/patterns to ignore (modify as needed)
+IGNORE_PATTERNS=(
+    "*.tmp"
+    "*.temp"
+    "*.log"
+    "*~"
+    ".DS_Store"
+    "Thumbs.db"
+    ".git/*"
+    "*.swp"
+    "*.lock"
+    ".nextcloud_sync_*"
+)
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Log file
+LOG_FILE="/tmp/nextcloud_monitor.log"
+
+# PID file to prevent multiple instances
+PID_FILE="/tmp/nextcloud_monitor.pid"
+
+# Function to log messages
+log_message() {
+    local level=$1
+    local message=$2
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${timestamp} [${level}] ${message}" | tee -a "$LOG_FILE"
+}
+
+# Function to check if file should be ignored
+should_ignore_file() {
+    local file_path=$1
+    local relative_path=${file_path#$WATCH_DIR/}
+    
+    for pattern in "${IGNORE_PATTERNS[@]}"; do
+        if [[ "$relative_path" == $pattern ]] || [[ "$file_path" == */$pattern ]]; then
+            return 0  # Should ignore
+        fi
+        
+        # Check for directory patterns
+        if [[ "$pattern" == *"/*" ]]; then
+            local dir_pattern=${pattern%/*}
+            if [[ "$relative_path" == $dir_pattern/* ]]; then
+                return 0  # Should ignore
+            fi
+        fi
+    done
+    
+    return 1  # Should not ignore
+}
+
+# Function to perform Nextcloud sync
+sync_nextcloud() {
+    log_message "INFO" "${BLUE}Starting Nextcloud sync...${NC}"
+    
+    if nextcloudcmd --path "$REMOTE_DIR" "$WATCH_DIR" "$NEXTCLOUD_URL" >> "$LOG_FILE" 2>&1; then
+        log_message "SUCCESS" "${GREEN}Nextcloud sync completed successfully${NC}"
+        return 0
+    else
+        log_message "ERROR" "${RED}Nextcloud sync failed${NC}"
+        return 1
+    fi
+}
+
+# Notification function
+notify() {
+    rv=$?
+    if [ -n "$DISPLAY" ]; then
+        dunstify "Nextcloud Sync Done"
+    fi
+    exit $rv
+}
+
+# Function to cleanup on exit
+cleanup() {
+    log_message "INFO" "${YELLOW}Stopping folder monitor...${NC}"
+    if [[ -f "$PID_FILE" ]]; then
+        rm -f "$PID_FILE"
+    fi
+    exit 0
+}
+
+# Function to check if another instance is running
+check_instance() {
+    if [[ -f "$PID_FILE" ]]; then
+        local old_pid=$(cat "$PID_FILE")
+        if kill -0 "$old_pid" 2>/dev/null; then
+            log_message "ERROR" "${RED}Another instance is already running (PID: $old_pid)${NC}"
+            exit 1
+        else
+            rm -f "$PID_FILE"
+        fi
+    fi
+    echo $$ > "$PID_FILE"
+}
+
+# Function to validate dependencies
+check_dependencies() {
+    local missing_deps=()
+    
+    if ! command -v inotifywait &> /dev/null; then
+        missing_deps+=("inotify-tools")
+    fi
+    
+    if ! command -v nextcloudcmd &> /dev/null; then
+        missing_deps+=("nextcloud-desktop-cmd")
+    fi
+    
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        log_message "ERROR" "${RED}Missing dependencies: ${missing_deps[*]}${NC}"
+        log_message "INFO" "Install with: sudo apt-get install ${missing_deps[*]}"
+        exit 1
+    fi
+}
+
+# Function to validate configuration
+validate_config() {
+    if [[ ! -d "$WATCH_DIR" ]]; then
+        log_message "ERROR" "${RED}Watch directory does not exist: $WATCH_DIR${NC}"
+        exit 1
+    fi
+    
+    if [[ -z "$NEXTCLOUD_URL" ]] || [[ -z "$USERNAME" ]] || [[ -z "$PASSWORD" ]]; then
+        log_message "ERROR" "${RED}Nextcloud configuration incomplete${NC}"
+        show_usage
+        exit 1
+    fi
+}
+
+# Function to show usage
+show_usage() {
+    echo "Usage: $0 [WATCH_DIR] [NEXTCLOUD_URL] [USERNAME] [PASSWORD] [REMOTE_DIR]"
+    echo ""
+    echo "Arguments:"
+    echo "  WATCH_DIR      - Local directory to monitor (default: /path/to/your/local/folder)"
+    echo "  NEXTCLOUD_URL  - Nextcloud server URL (default: https://your-nextcloud-server.com)"
+    echo "  USERNAME       - Nextcloud username"
+    echo "  PASSWORD       - Nextcloud password or app password"
+    echo "  REMOTE_DIR     - Remote directory path (default: /)"
+    echo ""
+    echo "Example:"
+    echo "  $0 /home/user/documents https://cloud.example.com myuser mypassword /Documents"
+    echo ""
+    echo "Environment variables can also be used:"
+    echo "  NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_PASS, NEXTCLOUD_REMOTE_DIR"
+}
+
+# Function for periodic sync
+periodic_sync() {
+    while true; do
+        sync_nextcloud
+        sleep 300  # 5 minutes
+    done
+}
+
+# Main function
+main() {
+    # Show usage if help requested
+    if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+        show_usage
+        exit 0
+    fi
+    
+    # Setup signal handlers
+    trap "notify" EXIT
+    trap cleanup SIGINT SIGTERM
+    
+    # Check for another instance
+    check_instance
+    
+    # Validate dependencies and configuration
+    check_dependencies
+    validate_config
+    
+    log_message "INFO" "${GREEN}Starting Nextcloud folder monitor${NC}"
+    log_message "INFO" "Watching directory: $WATCH_DIR"
+    log_message "INFO" "Nextcloud URL: $NEXTCLOUD_URL"
+    log_message "INFO" "Remote directory: $REMOTE_DIR"
+    log_message "INFO" "Ignored patterns: ${IGNORE_PATTERNS[*]}"
+    
+    # Start periodic sync in background
+    periodic_sync &
+    
+    # Cooldown period to prevent rapid successive syncs
+    local last_sync=0
+    local cooldown=10  # seconds
+    
+    # Initial sync on startup
+    sync_nextcloud
+    
+    # Monitor the directory
+    inotifywait -m -r -e create,delete,modify,move "$WATCH_DIR" --format '%w%f %e' |
+    while read file_path event; do
+        # Check if file should be ignored
+        if should_ignore_file "$file_path"; then
+            log_message "DEBUG" "Ignoring file: $file_path"
+            continue
+        fi
+        
+        # Check cooldown period
+        local current_time=$(date +%s)
+        if (( current_time - last_sync < cooldown )); then
+            log_message "DEBUG" "Sync cooldown active, skipping..."
+            continue
+        fi
+        
+        log_message "INFO" "${YELLOW}File change detected: $file_path ($event)${NC}"
+        
+        # Perform sync
+        if sync_nextcloud; then
+            last_sync=$current_time
+        fi
+    done
+}
+
+# Run main function
+main "$@"
